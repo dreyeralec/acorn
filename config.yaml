@@ -1,0 +1,8 @@
+ib:
+  account_type: "paper" # paper or live
+
+llm:
+  model: "gpt-5.4-mini"
+
+telegram:
+  timeout: 300 # seconds

@@ -1,5 +1,6 @@
 import pandas as pd
 
+
 NASDAQ_TICKERS_URL = "https://www.nasdaqtrader.com/dynamic/SymDir/nasdaqlisted.txt"
 OTHER_TICKERS_URL = "https://www.nasdaqtrader.com/dynamic/SymDir/otherlisted.txt"
 
@@ -36,7 +37,7 @@ def is_valid_ticker(symbol: str) -> bool:
     return symbol.upper() in US_MARKET_TICKERS
 
 
-def time_to_next_position_update() -> tuple[float, str]:
+def time_to_next_position_update() -> tuple[float, str]: # make these wake up windows customizable
     """Gets amount of time for ACORN to sleep until the next position update window
         currently using market open, noon, and eod.
 

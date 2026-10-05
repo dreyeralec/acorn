@@ -1,11 +1,11 @@
 from openai import OpenAI, OpenAIError
 from typing import Literal
 from pydantic import BaseModel
-from dotenv import load_dotenv
+from acorn.config import config
+import os
 
-load_dotenv()
 
-client = OpenAI()
+client = OpenAI(api_key=config.openai_key)
 
 
 class TradeAction(BaseModel):
@@ -37,11 +37,10 @@ def call_trading_model(content: str) -> TradingDecision:
             response: trading decision object
     """
     try:
-        with open("./prompts/TRADE.txt", "r", encoding="utf-8") as f:
+        with open("prompts/TRADE.txt", "r", encoding="utf-8") as f:
             sysPrompt = f.read()
-
         response = client.responses.parse(
-            model="gpt-5.4-mini",
+            model=config.model,
             instructions=sysPrompt,
             input=content,
             tools=[{"type": "web_search"}],
@@ -66,7 +65,7 @@ def call_analysis_model(content: str) -> str:
             response: trading decision object
     """
     try:
-        with open("./prompts/ANALYSIS.txt", "r", encoding="utf-8") as f:
+        with open("prompts/ANALYSIS.txt", "r", encoding="utf-8") as f:
             sysPrompt = f.read()
 
         response = client.responses.create(

@@ -4,6 +4,7 @@ import time
 from acorn.util import time_to_next_position_update
 from acorn.engine import dispatch_acorn
 from ib.gateway import connect_ib_gateway
+from acorn.config import config
 
 
 logging.basicConfig(
@@ -22,7 +23,7 @@ def run_cycle():
 
     logger.info(f"Awoke for {event} event")
 
-    gateway = connect_ib_gateway(port=4002, client_id=1) # paper gateway
+    gateway = connect_ib_gateway(port=config.ibg_port, client_id=1)
     if not gateway.isConnected():
         logger.error("Connection to gateway was not established")
         return

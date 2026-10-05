@@ -1,15 +1,10 @@
-import os
 import requests
 import logging
 
-from dotenv import load_dotenv
 from requests import RequestException
+from acorn.config import config
 
 logger = logging.getLogger(__name__)
-
-load_dotenv()
-
-TOKEN = os.getenv("TELEGRAM_BOT_KEY")
 
 
 class TelegramServiceError(Exception):
@@ -27,7 +22,7 @@ class TelegramClient:
         """Helper for posting to the Telegram API."""
         try:
             res = self.session.post(
-                f"https://api.telegram.org/bot{TOKEN}/{endpoint}",
+                f"https://api.telegram.org/bot{self.token}/{endpoint}",
                 json=payload,
                 timeout=10
             )
@@ -39,7 +34,7 @@ class TelegramClient:
     def _sync_telegram_offset(self) -> None:
         """Set offset variable to next telegram offset."""
         response = self.session.get(
-            f"https://api.telegram.org/bot{TOKEN}/getUpdates",
+            f"https://api.telegram.org/bot{self.token}/getUpdates",
             params={"offset": -1, "timeout": 0}
         )
         response.raise_for_status()
@@ -95,7 +90,7 @@ class TelegramClient:
         try:
             if self.offset is None:
                 self._sync_telegram_offset()
-            res = self.session.get(f"https://api.telegram.org/bot{TOKEN}/getUpdates", params={"timeout": 3000, "offset": self.offset})
+            res = self.session.get(f"https://api.telegram.org/bot{self.token}/getUpdates", params={"timeout": config.timeout, "offset": self.offset})
             res.raise_for_status()
             data = res.json()
             for update in data["result"]:
@@ -111,15 +106,15 @@ class TelegramClient:
             raise TelegramServiceError(f"Telegram API call to getUpdates failed:\n{e}") from e
 
 
-def _get_telegram_client() -> TelegramClient:
+def _get_telegram_client(key: str | None) -> TelegramClient:
     """Return telegram client singleton.
     
         Returns:
             Telegram client instance.
     """
-    if TOKEN is None:
+    if key is None:
         raise TelegramServiceError("Couldn't get telegram api key")
-    return TelegramClient(TOKEN)
+    return TelegramClient(key)
 
 
-telegram_client = _get_telegram_client()
+telegram_client = _get_telegram_client(config.telegram_bot_key)
