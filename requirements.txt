@@ -1,0 +1,8 @@
+ibapi
+openai
+pytest
+python-dotenv
+pandas
+pydantic
+PyYAML
+requests
