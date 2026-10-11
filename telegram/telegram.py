@@ -18,7 +18,7 @@ class TelegramClient:
         self.token = token
         self.offset = None
 
-    def _post(self, endpoint: str, payload: dict) -> None:
+    def _post(self, endpoint: str, payload: dict[str, str | int]) -> None:
         """Helper for posting to the Telegram API."""
         try:
             res = self.session.post(

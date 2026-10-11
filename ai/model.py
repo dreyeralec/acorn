@@ -2,7 +2,6 @@ from openai import OpenAI, OpenAIError
 from typing import Literal
 from pydantic import BaseModel
 from acorn.config import config
-import os
 
 
 client = OpenAI(api_key=config.openai_key)
@@ -74,7 +73,7 @@ def call_analysis_model(content: str) -> str:
             tools=[{"type": "web_search"}],
             input=content,
         )
-        if response.output_text is None:
+        if response.output_text == "":
             raise AIServiceError("Model returned no text")
         return response.output_text
     except OpenAIError as e:

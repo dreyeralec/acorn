@@ -1,9 +1,17 @@
-from ibapi.client import EClient
-from ibapi.wrapper import EWrapper
 import threading
 import queue
 import logging
 import pandas as pd
+
+from ibapi.common import OrderId
+from threading import Event
+from queue import Queue
+from pandas.core.frame import DataFrame
+from _thread import lock
+from typing import Any, override
+
+from ibapi.client import EClient, OrderId
+from ibapi.wrapper import EWrapper
 
 logger = logging.getLogger(__name__)
 
@@ -11,80 +19,99 @@ logger = logging.getLogger(__name__)
 # Wrapper for handling callback functions called by the gateway connection
 # custom functionality can be added here
 class IBApp(EWrapper, EClient):
-    def __init__(self):
-        EClient.__init__(self, self)
-        self.next_order_id = None
-        self.connected_event = threading.Event()
-        self.request_positions_event = threading.Event()
-        self.account_summary_event = threading.Event()
-        self.data_queue = queue.Queue(0)   # hand data off to your main thread
-        self.positions = pd.DataFrame([], columns = ['Account', 'Symbol', 'Quantity', 'Average Cost'])
-        self.account_values = {}
-        self.open_orders = {}
-        self.lock = threading.Lock()
+    def __init__(self) -> None:
+        EClient.__init__(self, wrapper=self)
+        self.order_id: OrderId | None = None
+        self.connected_event: Event = threading.Event()
+        self.request_positions_event: Event = threading.Event()
+        self.account_summary_event: Event = threading.Event()
+        self.data_queue: Queue[dict[str, str | float | int]] = queue.Queue(maxsize=0)   # data accessible to main thread
+        self.positions: DataFrame = pd.DataFrame(data=[], columns=['Account', 'Symbol', 'Quantity', 'Average Cost'])
+        self.account_values: dict[str, str | float | int] = {}
+        self.open_orders: dict[Any, Any] = {}
+        self.lock: lock = threading.Lock()
 
-    # ---- Connection lifecycle ----
     # called on init
-    def nextValidId(self, orderId: int):
-        super().nextValidId(orderId) # preserve original nextValidId() base functionality
+    @override
+    def nextValidId(self, orderId: OrderId) -> None:
         with self.lock:
-            self.next_order_id = orderId
+            self.order_id = orderId
         self.connected_event.set()
         logger.info(f"Connected. Next order ID: {orderId}")
 
-    def get_next_order_id(self):
+
+    def get_next_order_id(self) -> OrderId:
         with self.lock:
-            if self.next_order_id is not None:
-                oid = self.next_order_id
-                self.next_order_id += 1
+            if self.order_id is not None:
+                oid = self.order_id
+                self.order_id += 1
                 return oid
             else:
                 logger.error("next_order_id is null in get_next_order_id()")
                 raise RuntimeError("next_order_id is null in get_next_order_id()")
 
-    def connectionClosed(self):
+
+    @override
+    def connectionClosed(self) -> None:
         logger.warning("Connection closed — need reconnect logic here")
         self.connected_event.clear()
 
-    def error(self, reqId, errorCode, errorString, advancedOrderRejectJson=""):
+
+    @override
+    def error(self, reqId, errorCode, errorString, advancedOrderRejectJson="") -> None:
         # Codes 2104, 2106, 2158 etc. are informational, not errors
         if errorCode in (2104, 2106, 2158):
             logger.info(f"Info: {errorString}")
         else:
             logger.error(f"Error {errorCode} (reqId {reqId}): {errorString}")
 
-    # ---- Order/account callbacks ----
-    def orderStatus(self, orderId, status, filled, remaining, avgFillPrice, permId, parentId, lastFillPrice, clientId, whyHeld, mktCapPrice):
+
+    @override
+    def orderStatus(self, orderId, status, filled, remaining, avgFillPrice, permId, parentId, lastFillPrice, clientId, whyHeld, mktCapPrice) -> None:
         logger.info(f"Order {orderId}: {status}, filled={filled}, avgPrice={avgFillPrice}")
         with self.lock:
             self.open_orders[orderId] = status
 
-    def position(self, account, contract, position, avgCost):
+
+    @override
+    def position(self, account, contract, position, avgCost) -> None:
         with self.lock:
-            index = str(account) + str(contract.symbol)
+            index: str = str(account) + str(contract.symbol)
             self.positions.loc[index] = account, contract.symbol, position, avgCost
 
-    def positionEnd(self):
+
+    @override
+    def positionEnd(self) -> None:
         return self.request_positions_event.set()
 
-    def updateAccountValue(self, key: str, val: str, currency: str, accountName: str):
+
+    @override
+    def updateAccountValue(self, key: str, val: str, currency: str, accountName: str) -> None:
         self.account_values[key] = float(val)
 
-    def accountSummary(self, reqId: int, account: str, tag: str, value: str, currency: str):
+
+    @override
+    def accountSummary(self, reqId: int, account: str, tag: str, value: str, currency: str) -> None:
         self.account_values[tag] = value
 
-    def accountSummaryEnd(self, reqId):
+
+    @override
+    def accountSummaryEnd(self, reqId) -> None:
         return self.account_summary_event.set()
 
-    # ---- Market data ----
-    def tickPrice(self, reqId, tickType, price, attrib):
-        self.data_queue.put(("tick", reqId, tickType, price))
 
-    def historicalData(self, reqId, bar):
-        print(f"reqId={reqId} {bar.date} O:{bar.open} H:{bar.high} "
-            f"L:{bar.low} C:{bar.close} V:{bar.volume}")
-        self.data_queue.put(("bar", reqId, bar))
+    @override
+    def tickPrice(self, reqId, tickType, price, attrib) -> None:
+        self.data_queue.put(item=({"event": "ticker", "req_id": reqId, "tick_type": tickType, "price": price}))
 
-    def historicalDataEnd(self, reqId, start, end):
+
+    @override
+    def historicalData(self, reqId, bar) -> None:
+        print(f"reqId={reqId} {bar.date} O:{bar.open} H:{bar.high} L:{bar.low} C:{bar.close} V:{bar.volume}")
+        self.data_queue.put(item=("bar", reqId, bar))
+
+
+    @override
+    def historicalDataEnd(self, reqId, start, end) -> None:
         print(f"Historical data complete for reqId {reqId}: {start} to {end}")
-        self.data_queue.put(("bars_done", reqId))
+        self.data_queue.put(item=("bars_done", reqId))

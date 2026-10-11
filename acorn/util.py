@@ -65,3 +65,17 @@ def time_to_next_position_update() -> tuple[float, str]: # make these wake up wi
     else:
         nextOpen = targetOpen + timedelta(days=1)
         return (nextOpen - nowEst).total_seconds(), "open"
+
+
+def eval_user_res(res: str | None) -> bool:
+    """Process the user's telegram message in response to a trading recommendation.
+    
+        Args:
+            response: String of the user's response.
+
+        Returns:
+            If the user confirmed or denied the recommendation.
+    """
+    if res is None or "yes" not in res.lower():
+        return False
+    return True

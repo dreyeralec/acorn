@@ -1,77 +1,22 @@
 import logging
-import json
+
+import logging
 
 from ibapi.contract import Contract
 from ibapi.order import Order
 
-from pandas import DataFrame
-
-from ai.model import call_trading_model, call_analysis_model, AIServiceError
-from .util import is_valid_ticker
+from ai.model import (
+    call_trading_model,
+    call_analysis_model,
+    AIServiceError
+)
+from .util import is_valid_ticker, eval_user_res
+from .adapter import get_account_portfolio_json, consume_queue
 from telegram.telegram import telegram_client, TelegramServiceError
 from ib.gateway import connect_ib_gateway
+from .config import config
 
 logger = logging.getLogger(__name__)
-
-
-def _get_portfolio_data() -> DataFrame:
-    """Fetch portfolio data and return as a DataFrame.
-    
-        Returns:
-            Dataframe of portfolio positions.
-    """
-    gateway = connect_ib_gateway()
-    gateway.request_positions_event.clear()
-    gateway.reqPositions()
-    if not gateway.request_positions_event.wait(timeout=10):
-        raise TimeoutError("Timed out waiting for request positions")
-    gateway.cancelPositions()
-    return gateway.positions.copy()
-
-
-def _get_portfolio_data_json() -> str:
-    """Fetch current portfolio positions as a JSON string.
-    
-        Returns:
-            String of portfolio positions.
-    """
-    return _get_portfolio_data().to_json(orient="records")
-
-
-def _get_account_data() -> dict:
-    """Fetch current account info as a dictionary.
-    
-        Returns:
-            Account data as a dictionary.
-    """
-    gateway = connect_ib_gateway()
-    tags = "NetLiquidation,TotalCashValue,BuyingPower,AvailableFunds,UnrealizedPnL,RealizedPnL"
-    gateway.account_summary_event.clear()
-    gateway.reqAccountSummary(9001, "All", tags)
-    if not gateway.account_summary_event.wait(timeout=10):
-        raise TimeoutError("Timed out waiting for account summary")
-    gateway.cancelAccountSummary(9001)
-    return gateway.account_values.copy()
-
-
-def _get_account_data_json() -> str:
-    """Fetch current account info as a JSON string.
-
-        Returns:
-            String of account data.
-    """
-    return json.dumps(_get_account_data())
-
-
-def _get_account_portfolio_json() -> str:
-    """Fetch account and portfolio information as JSON string.
-    
-        Returns:
-            Combined account and portfolio data as a string.
-    """
-    portfolio = _get_portfolio_data_json()
-    account = _get_account_data_json()
-    return json.dumps(account + portfolio)
 
 
 def wait_res() -> str | None:
@@ -89,21 +34,6 @@ def wait_res() -> str | None:
     telegram_client.tel_notify("No response received, aborting action")
     return None
 
-# todo: make this more flexible
-def eval_user_res(res: str | None) -> bool:
-    """Process the user's telegram message in response to a trading recommendation.
-    
-        Args:
-            response: String of the user's response.
-
-        Returns:
-            If the user confirmed or denied the recommendation.
-    """
-    if res is None:
-        return False
-    if "yes" in res.lower():
-        return True
-    return False
 
 
 def get_user_approval(symbol: str, action: str, quantity: int, order_type: str, limit_price: float | None, reasoning: str, act: int, totalActs: int) -> bool:
@@ -126,7 +56,7 @@ def get_user_approval(symbol: str, action: str, quantity: int, order_type: str, 
         telegram_client.tel_send_trade(symbol, action, quantity, order_type, limit_price, reasoning, act, totalActs)
         userRes = wait_res()
         return eval_user_res(userRes)
-    except TelegramServiceError as e:
+    except TelegramServiceError:
         logger.error(f"Couldn't reach Telegram, decision defaulting to NO")
         return False
 
@@ -226,19 +156,38 @@ def make_order(action: str, order_type: str, limit_price: float | None, quantity
     if quantity < 0:
         logger.warning(f"Caught an invalid quantity {quantity} while trying to build an order")
         raise ValueError(f"Invalid quantity {quantity}")
-    
+
     o = Order()
     o.action = action
     o.orderType = order_type
     o.totalQuantity = quantity
     o.eTradeOnly = False # avoid deprecated-field errors on recent API versions
     o.firmQuoteOnly = False
-    if order_type in ["LMT", "STP LMT", "LIT"]: # if a limit price is required
+    if order_type in ["LMT", "STP LMT", "LIT"]:
         if limit_price is None:
             logger.warning(f"Order type {order_type} requires a limit price but none was given")
             raise ValueError(f"Order type {order_type} requires a limit price")
         o.lmtPrice = limit_price
     return o
+
+# test this, this is going to connect with a config variable where we accept lmt prices within a certain bound
+def get_mkt_price(contract: Contract) -> float:
+    """Get the market price for a given contract.
+
+        Args:
+            Contract to see price for.
+
+        Returns:
+            Market price for contract, or 0 if not found.
+    """
+    gateway = connect_ib_gateway()
+    gateway.reqMarketDataType(config.data_relevancy)
+    gateway.reqMktData(gateway.get_next_order_id(), contract, "", False, False, [])
+    data = consume_queue(gateway)
+    if data is None:
+        logger.warning(f"Contract {contract.symbol} returned price of 0")
+        return 0
+    return float(data["price"])
 
 
 def stage_action(symbol: str, action: str, quantity: int, order_type: str, limit_price: float | None, reasoning: str, act: int, totalActs: int) -> None:
@@ -282,6 +231,9 @@ def place_trade(symbol: str, action: str, quantity: int, order_type: str, limit_
     try:
         contract = make_contract(symbol)
         order = make_order(action, order_type, limit_price, quantity)
+        if order_type == "LMT":
+            if not validate_lmt_MoE(contract, limit_price):
+                raise ValueError(f"Limit price {limit_price} out of bounds")
         submit_order(contract, order)
         logger.info(f"Performed {action} on {symbol}")
         telegram_client.tel_notify(f"{action} {symbol} succeeded")
@@ -290,7 +242,24 @@ def place_trade(symbol: str, action: str, quantity: int, order_type: str, limit_
         telegram_client.tel_notify(f"ACORN rejected an order: {e}")
     except RuntimeError as e:
         logger.error(f"ACORN hit a runtime error: {e}")
-        telegram_client.tel_notify(f"ACORN hit a runtime error: {e}")
+        telegram_client.tel_notify(f"ACORN hit a runtime error placing a trade: {e}")
+
+
+def validate_lmt_MoE(contract: Contract, limit_price: float | None) -> bool:
+    """Validate incoming limit_price from model.
+
+        Args:
+            contract to test.
+            limit_price from model.
+
+        Returs:
+            If the limit_price was acceptable.
+    """
+    if limit_price is None: return False
+    mkt_price = get_mkt_price(contract)
+    if mkt_price < limit_price * (1 - config.limit_MoE) or mkt_price > limit_price * (1 + config.limit_MoE):
+        return False
+    return True
 
 
 def submit_order(contract: Contract, order: Order) -> None:
@@ -301,11 +270,8 @@ def submit_order(contract: Contract, order: Order) -> None:
             order: IB Order object.
 
         Raises:
-            RuntimeError: contract or order was None, or gateway rejected the order.
+            RuntimeError: Gateway rejected the order.
     """
-    if contract is None or order is None:
-        raise RuntimeError(f"contract or order is None. Contract: {contract} Order: {order}")
-
     gateway = connect_ib_gateway()
     order_id = gateway.get_next_order_id()
     try:
@@ -320,7 +286,7 @@ def dispatch_acorn(event: str) -> None:
         Args:
             event: event ACORN is responding to (open, noon, eod)
     """
-    portfolio_data = _get_account_portfolio_json()
+    portfolio_data = get_account_portfolio_json()
 
     if event in ("open", "noon"):
         get_trade_dec(portfolio_data)

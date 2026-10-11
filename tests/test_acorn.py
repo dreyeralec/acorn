@@ -7,10 +7,11 @@ from ibapi.order import Order
 from acorn.engine import (
     make_contract,
     make_order,
-    eval_user_res,
-    _get_portfolio_data,
-    _get_account_data
+    get_mkt_price,
+    validate_lmt_MoE
 )
+from acorn.util import eval_user_res
+from acorn.adapter import get_account_data, get_portfolio_data
 
 def test_make_valid_contract():
     c = Contract()
@@ -28,28 +29,28 @@ def test_make_valid_contract():
 def test_make_invalid_contract_ticker():
     t = "NVIDIA"
     with pytest.raises(ValueError, match=f"Invalid ticker {t}"):
-        make_contract(t)
+        _ = make_contract(t)
 
 
 def test_make_invalid_contract_sec_type():
     t = "NVDA"
     st = "LOAN"
     with pytest.raises(ValueError, match=f"Invalid or unsupported security type {st}"):
-        make_contract(symbol=t, sec_type=st)
+        _ = make_contract(symbol=t, sec_type=st)
 
 
 def test_make_invalid_contract_exchange():
     t = "PLTR"
     et = "GARAGE SALE"
     with pytest.raises(ValueError, match=f"Invalid or unsupported exchange type {et}"):
-        make_contract(symbol=t, exchange=et)
+        _ = make_contract(symbol=t, exchange=et)
 
 
 def test_make_invalid_contract_currency():
     t = "MSFT"
     c = "EURO"
     with pytest.raises(ValueError, match=f"Invalid or unsupported currency type {c}"):
-        make_contract(symbol=t, currency=c)
+        _ = make_contract(symbol=t, currency=c)
 
 
 def test_make_valid_order():
@@ -70,7 +71,7 @@ def test_make_invalid_order_action():
     l = None
     q = 2
     with pytest.raises(ValueError, match=f"Invalid or unsupported action {a}"):
-        make_order(a, ot, l, q)
+        _ = make_order(a, ot, l, q)
 
 
 def test_make_invalid_order_type():
@@ -79,7 +80,7 @@ def test_make_invalid_order_type():
     l = None
     q = 2
     with pytest.raises(ValueError, match=f"Invalid or unsupported order type {ot}"):
-        make_order(a, ot, l, q)
+        _ = make_order(a, ot, l, q)
 
 
 def test_make_invalid_order_quantity():
@@ -88,7 +89,7 @@ def test_make_invalid_order_quantity():
     l = None
     q = -2
     with pytest.raises(ValueError, match=f"Invalid quantity {q}"):
-        make_order(a, ot, l, q)
+        _ = make_order(a, ot, l, q)
 
 # test limit price code paths
 def test_make_invalid_order_no_limit_price():
@@ -97,7 +98,7 @@ def test_make_invalid_order_no_limit_price():
     l = None
     q = 2
     with pytest.raises(ValueError, match=f"Order type {ot} requires a limit price"):
-        make_order(a, ot, l, q)
+        _ = make_order(a, ot, l, q)
 
 
 def test_market_order_with_limit_price():
@@ -125,12 +126,33 @@ def test_handle_response_no():
 
 
 def test_fetch_portfolio_data():
-    pdata = _get_portfolio_data()
-    assert type(pdata) == pd.DataFrame
-    assert pdata.columns.to_list() == ['Account', 'Symbol', 'Quantity', 'Average Cost']
+    data = get_portfolio_data()
+    assert type(data) == pd.DataFrame
+    assert data.columns.to_list() == ['Account', 'Symbol', 'Quantity', 'Average Cost']
 
 
 def test_fetch_account_data():
-    adata = _get_account_data()
-    assert type(adata) == dict
-    assert list(adata.keys()) == ['AvailableFunds', 'BuyingPower', 'NetLiquidation', 'TotalCashValue']
+    data = get_account_data()
+    assert type(data) == dict
+    assert list(data.keys()) == ['AvailableFunds', 'BuyingPower', 'NetLiquidation', 'TotalCashValue']
+
+
+def test_get_market_price():
+    c = Contract()
+    c.symbol = "AAPL"
+    c.secType = "STK"
+    c.exchange = "SMART"
+    c.currency = "USD"
+    curr = get_mkt_price(c)
+    assert curr is not None
+    assert curr > 0
+
+
+def test_validate_lmt_MoE():
+    c = Contract()
+    c.symbol = "AAPL"
+    c.secType = "STK"
+    c.exchange = "SMART"
+    c.currency = "USD"
+    assert validate_lmt_MoE(c, 1.2) is False
+    assert validate_lmt_MoE(c, get_mkt_price(c)) is True
