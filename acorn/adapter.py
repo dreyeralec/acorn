@@ -2,7 +2,7 @@ import logging
 import json
 from queue import Empty, ShutDown
 
-from ib.ib import IBApp
+from ib.ib import IBApp, BarData
 from pandas import DataFrame
 from ib.gateway import connect_ib_gateway
 
@@ -71,7 +71,7 @@ def get_account_portfolio_json() -> str:
     return json.dumps(account + portfolio)
 
 
-def consume_queue(gateway: IBApp, timeout: int = 10) -> dict[str, str | float] | None:
+def consume_queue(gateway: IBApp, timeout: int = 10) -> dict[str, str | float | BarData] | None:
     try:
         return gateway.data_queue.get(timeout=timeout)
     except (Empty, ShutDown):

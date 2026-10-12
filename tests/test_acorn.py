@@ -12,8 +12,9 @@ from acorn.engine import (
     validate_lmt_MoE,
     place_trade
 )
-from acorn.util import eval_user_res
+from acorn.util import eval_user_res, is_valid_ticker
 from acorn.adapter import get_account_data, get_portfolio_data
+
 
 def test_make_valid_contract():
     c = Contract()
@@ -120,9 +121,6 @@ def test_market_order_with_limit_price():
 def test_handle_response_yes():
     assert eval_user_res("Yes") is True
     assert eval_user_res("yes please") is True
-
-
-def test_handle_response_no():
     assert eval_user_res("no") is False
     assert eval_user_res("") is False
 
@@ -177,3 +175,24 @@ def test_place_trade():
         place_trade("AAPL", "BUY", 5, "LMT", get_mkt_price(c))
         mock_submit_order.assert_called_once()
         mock_tel_notify.assert_called_once()
+
+
+def test_valid_ticker():
+    assert is_valid_ticker("aapl") is True
+    assert is_valid_ticker("NVDA") is True
+    assert is_valid_ticker("NVIDIA") is False
+
+
+def test_config_loads():
+    from acorn.config import config
+
+    assert config is not None
+    assert config.ibg_port in [4001, 4002]
+    assert config.data_relevancy in range(0, 6)
+    assert config.limit_MoE < 1 and config.limit_MoE > 0
+    assert config.model != ""
+    assert config.timeout > 0
+    assert config.openai_key is not None
+    assert config.openai_key != ""
+    assert config.telegram_bot_key is not None
+    assert config.telegram_bot_key != ""
