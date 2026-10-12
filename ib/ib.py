@@ -10,7 +10,7 @@ from pandas.core.frame import DataFrame
 from _thread import lock
 from typing import Any, override
 
-from ibapi.client import EClient, OrderId
+from ibapi.client import BarData, EClient, OrderId
 from ibapi.wrapper import EWrapper
 
 logger = logging.getLogger(__name__)
@@ -25,7 +25,7 @@ class IBApp(EWrapper, EClient):
         self.connected_event: Event = threading.Event()
         self.request_positions_event: Event = threading.Event()
         self.account_summary_event: Event = threading.Event()
-        self.data_queue: Queue[dict[str, str | float | int]] = queue.Queue(maxsize=0)   # data accessible to main thread
+        self.data_queue: Queue[dict[str, str | float | int | BarData]] = queue.Queue(maxsize=0)   # data accessible to main thread
         self.positions: DataFrame = pd.DataFrame(data=[], columns=['Account', 'Symbol', 'Quantity', 'Average Cost'])
         self.account_values: dict[str, str | float | int] = {}
         self.open_orders: dict[Any, Any] = {}
@@ -107,11 +107,9 @@ class IBApp(EWrapper, EClient):
 
     @override
     def historicalData(self, reqId, bar) -> None:
-        print(f"reqId={reqId} {bar.date} O:{bar.open} H:{bar.high} L:{bar.low} C:{bar.close} V:{bar.volume}")
-        self.data_queue.put(item=("bar", reqId, bar))
+        self.data_queue.put(item=({"event": "bar", "req_id": reqId, "bar": bar}))
 
 
     @override
     def historicalDataEnd(self, reqId, start, end) -> None:
-        print(f"Historical data complete for reqId {reqId}: {start} to {end}")
-        self.data_queue.put(item=("bars_done", reqId))
+        return

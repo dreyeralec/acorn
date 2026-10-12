@@ -2,13 +2,15 @@ import pytest
 import pandas as pd
 import sys
 
+from unittest.mock import patch
 from ibapi.contract import Contract
 from ibapi.order import Order
 from acorn.engine import (
     make_contract,
     make_order,
     get_mkt_price,
-    validate_lmt_MoE
+    validate_lmt_MoE,
+    place_trade
 )
 from acorn.util import eval_user_res
 from acorn.adapter import get_account_data, get_portfolio_data
@@ -113,7 +115,7 @@ def test_market_order_with_limit_price():
     assert o.lmtPrice != t.lmtPrice # IB defaults lmtPrice to float max value
     assert t.lmtPrice == sys.float_info.max
     assert o.totalQuantity == t.totalQuantity
-    
+
 
 def test_handle_response_yes():
     assert eval_user_res("Yes") is True
@@ -156,3 +158,22 @@ def test_validate_lmt_MoE():
     c.currency = "USD"
     assert validate_lmt_MoE(c, 1.2) is False
     assert validate_lmt_MoE(c, get_mkt_price(c)) is True
+
+
+def test_place_trade():
+    limit_price = 10
+    c = Contract()
+    c.symbol = "AAPL"
+    c.secType = "STK"
+    c.exchange = "SMART"
+    c.currency = "USD"
+    with patch("telegram.telegram.telegram_client.tel_notify") as mock_tel_notify:
+        place_trade("NVDA", "BUY", 5, "LMT", limit_price)
+        mock_tel_notify.assert_called_once()
+    with (
+        patch("acorn.engine.submit_order") as mock_submit_order,
+        patch("telegram.telegram.telegram_client.tel_notify") as mock_tel_notify,
+    ):
+        place_trade("AAPL", "BUY", 5, "LMT", get_mkt_price(c))
+        mock_submit_order.assert_called_once()
+        mock_tel_notify.assert_called_once()

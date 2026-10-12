@@ -1,12 +1,12 @@
 import pytest
 
 from ai.model import call_trading_model, call_analysis_model
-from acorn.engine import _get_account_portfolio_json
+from acorn.adapter import get_account_portfolio_json
 from acorn.util import is_valid_ticker
 
 
 def test_call_trading_model():
-    port = _get_account_portfolio_json() # build some fake data instead of this
+    port = get_account_portfolio_json() # build some fake data instead of this
     res = call_trading_model(port)
     print(res)
     assert res is not None
@@ -17,11 +17,7 @@ def test_call_trading_model():
 
 
 def test_call_analysis_model():
-    port = _get_account_portfolio_json() # build some fake data instead of this
+    port = get_account_portfolio_json() # build some fake data instead of this
     res = call_analysis_model(port)
     assert res is not None
     assert len(res) > 0
-
-
-
-    # write tests for error messages

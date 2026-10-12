@@ -57,7 +57,7 @@ def get_account_data_json() -> str:
     """
     return json.dumps(get_account_data())
 
-# think of a better way to handle portfolio being None
+
 def get_account_portfolio_json() -> str:
     """Fetch account and portfolio information as JSON string.
     

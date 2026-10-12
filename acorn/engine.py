@@ -1,7 +1,5 @@
 import logging
 
-import logging
-
 from ibapi.contract import Contract
 from ibapi.order import Order
 
@@ -33,7 +31,6 @@ def wait_res() -> str | None:
         return message
     telegram_client.tel_notify("No response received, aborting action")
     return None
-
 
 
 def get_user_approval(symbol: str, action: str, quantity: int, order_type: str, limit_price: float | None, reasoning: str, act: int, totalActs: int) -> bool:
@@ -170,7 +167,7 @@ def make_order(action: str, order_type: str, limit_price: float | None, quantity
         o.lmtPrice = limit_price
     return o
 
-# test this, this is going to connect with a config variable where we accept lmt prices within a certain bound
+
 def get_mkt_price(contract: Contract) -> float:
     """Get the market price for a given contract.
 
@@ -184,8 +181,8 @@ def get_mkt_price(contract: Contract) -> float:
     gateway.reqMarketDataType(config.data_relevancy)
     gateway.reqMktData(gateway.get_next_order_id(), contract, "", False, False, [])
     data = consume_queue(gateway)
-    if data is None:
-        logger.warning(f"Contract {contract.symbol} returned price of 0")
+    if data is None or float(data["price"]) < 0:
+        logger.warning(f"Contract {contract.symbol} returned no price")
         return 0
     return float(data["price"])
 
@@ -255,7 +252,8 @@ def validate_lmt_MoE(contract: Contract, limit_price: float | None) -> bool:
         Returs:
             If the limit_price was acceptable.
     """
-    if limit_price is None: return False
+    if limit_price is None:
+        return False
     mkt_price = get_mkt_price(contract)
     if mkt_price < limit_price * (1 - config.limit_MoE) or mkt_price > limit_price * (1 + config.limit_MoE):
         return False
