@@ -16,6 +16,8 @@ from ibapi.wrapper import EWrapper
 logger = logging.getLogger(__name__)
 
 
+# I want to fix this file and make its implementation a lot cleaner
+
 # Wrapper for handling callback functions called by the gateway connection
 # custom functionality can be added here
 class IBApp(EWrapper, EClient):
@@ -25,7 +27,7 @@ class IBApp(EWrapper, EClient):
         self.connected_event: Event = threading.Event()
         self.request_positions_event: Event = threading.Event()
         self.account_summary_event: Event = threading.Event()
-        self.data_queue: Queue[dict[str, str | float | int | BarData]] = queue.Queue(maxsize=0)   # data accessible to main thread
+        self.data_queue: Queue[dict[str, str | float | int | BarData]] = queue.Queue(maxsize=0) # data accessible to main thread
         self.positions: DataFrame = pd.DataFrame(data=[], columns=['Account', 'Symbol', 'Quantity', 'Average Cost'])
         self.account_values: dict[str, str | float | int] = {}
         self.open_orders: dict[Any, Any] = {}

@@ -1,10 +1,10 @@
 ib:
-  account_type: "paper" # paper or live
-  data_relevancy: 3 # 1: live (requires subscription), 2: frozen (market closed), 3: delayed 15-20 min (free)
-  limit_MoE: 0.04 # margin of error for AI generated limit pricing being allowed (percentage)
+  account_type: "paper"
+  data_relevancy: 3
+  limit_MoE: 0.04
 
 llm:
   model: "gpt-5.4-mini"
 
 telegram:
-  timeout: 3000 # seconds
+  timeout: 3000
