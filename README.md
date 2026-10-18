@@ -1,7 +1,7 @@
 Acorn is a fully autonomous securities trading system using the IB Gateway from Interactive Brokers and ChatGPT as its brain.
 Acorn uses Telegram to interface with the user, allowing the user to control the system from anywhere.
 
-# Configuration
+## Configuration
 ```
   account_type: ("paper", "live") decides what account type to use
   data_relevancy: 1 for live data (requires subscription), 2 for frozen (market closed, free), 3 for 15-20 minute delay (free)
@@ -9,3 +9,9 @@ Acorn uses Telegram to interface with the user, allowing the user to control the
   model: OpenAI model to be used
   timeout: time the user has to respond to a trade proposition on telegram
 ```
+
+## In the future
+- Support for other AI models
+- Pipelines for providing real data to the model instead of relying on its web-search tool
+- Configurable wake-up times
+- Containerized to run in the cloud
