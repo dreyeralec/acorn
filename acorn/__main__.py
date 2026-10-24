@@ -41,11 +41,15 @@ def main():
             logger.error(f"Disconnected from IB Gateway unexpectedly or trouble establishing connection:\n\n{e}")
             time.sleep(30)
         except TelegramServiceError as e:
-            logger.error(f"Lost communication with telegram: {e}")
+            logger.critical(f"Lost communication with telegram, shutting down ACORN: {e}")
             break
         except EngineError as e:
             logger.error(f"Encountered an engine error: {e}")
-            telegram_client.tel_notify(f"Encountered an engine error: {e}")
+            try:
+                telegram_client.tel_notify(f"Encountered an engine error: {e}")
+            except TelegramServiceError as e:
+                logger.critical(f"Lost communication with telegram during an Engine Error, shutting down ACORN: {e}")
+                break
 
 
 if __name__ == "__main__":
