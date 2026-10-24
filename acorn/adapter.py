@@ -30,7 +30,7 @@ def get_portfolio_data_json() -> str | None:
         Returns:
             String of portfolio positions.
     """
-    return get_portfolio_data().to_json("records")
+    return get_portfolio_data().to_json(orient="records")
 
 
 def get_account_data() -> dict[str, str | float | int]:
