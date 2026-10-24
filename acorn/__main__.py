@@ -2,9 +2,10 @@ import logging
 import time
 
 from acorn.util import time_to_next_position_update
-from acorn.engine import dispatch_acorn
+from acorn.engine import dispatch_acorn, EngineError
 from ib.gateway import connect_ib_gateway
 from acorn.config import config
+from telegram.telegram import telegram_client, TelegramServiceError
 
 
 logging.basicConfig(
@@ -39,6 +40,12 @@ def main():
         except ConnectionError as e:
             logger.error(f"Disconnected from IB Gateway unexpectedly or trouble establishing connection:\n\n{e}")
             time.sleep(30)
+        except TelegramServiceError as e:
+            logger.error(f"Lost communication with telegram: {e}")
+            break
+        except EngineError as e:
+            logger.error(f"Encountered an engine error: {e}")
+            telegram_client.tel_notify(f"Encountered an engine error: {e}")
 
 
 if __name__ == "__main__":

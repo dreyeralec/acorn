@@ -5,16 +5,19 @@ from ibapi.order import Order
 
 from ai.model import (
     call_trading_model,
-    call_analysis_model,
-    AIServiceError
+    call_analysis_model
 )
 from .util import is_valid_ticker, eval_user_res
 from .adapter import get_account_portfolio_json, consume_queue
-from telegram.telegram import telegram_client, TelegramServiceError
+from telegram.telegram import telegram_client
 from ib.gateway import connect_ib_gateway
 from .config import config
 
 logger = logging.getLogger(__name__)
+
+
+class EngineError(Exception):
+    """Any error is caught here"""
 
 
 def wait_res() -> str | None:
@@ -49,13 +52,9 @@ def get_user_approval(symbol: str, action: str, quantity: int, order_type: str, 
         Returns:
             The user's decision on the trade recommendation.
     """
-    try:
-        telegram_client.tel_send_trade(symbol, action, quantity, order_type, limit_price, reasoning, act, totalActs)
-        userRes = wait_res()
-        return eval_user_res(userRes)
-    except TelegramServiceError:
-        logger.error(f"Couldn't reach Telegram, decision defaulting to NO")
-        return False
+    telegram_client.tel_send_trade(symbol, action, quantity, order_type, limit_price, reasoning, act, totalActs)
+    userRes = wait_res()
+    return eval_user_res(userRes)
 
             
 def get_trade_dec(portfolio_data: str) -> None:
@@ -64,11 +63,7 @@ def get_trade_dec(portfolio_data: str) -> None:
         Args:
             portfolio_data: String of portfolio positions.
     """
-    try:
-        trading_decision = call_trading_model(portfolio_data)
-    except AIServiceError as e:
-        logger.warning(f"Trading model returned no decision:\n{e}")
-        return
+    trading_decision = call_trading_model(portfolio_data)
     
     totalActs = len(trading_decision.actions)
     for act, a in enumerate(trading_decision.actions, start=1):
@@ -85,11 +80,7 @@ def eod_analysis(portfolio_data: str) -> None:
         Args:
             portfolio_data: String of portfolio positions.
     """
-    try:
-        res = call_analysis_model(portfolio_data)
-    except AIServiceError as e:
-        logger.warning(f"Analysis model returned no response:\n{e}")
-        return
+    res = call_analysis_model(portfolio_data)
     telegram_client.tel_notify(res)
 
 
@@ -199,10 +190,6 @@ def stage_action(symbol: str, action: str, quantity: int, order_type: str, limit
             reasoning: Model's thesis for the trade.
             act: Index of the current action.
             totalActs: Amount of total actions model is recommending.
-        
-        Raises:
-            ValueError: A contract or order contained a bad value.
-            RuntimeError: Contract or order was not created.
     """
     if (get_user_approval(symbol, action, quantity, order_type, limit_price, reasoning, act, totalActs)):
         place_trade(symbol, action, quantity, order_type, limit_price)
@@ -223,23 +210,15 @@ def place_trade(symbol: str, action: str, quantity: int, order_type: str, limit_
         
         Raises:
             ValueError: A contract or order contained a bad value.
-            RuntimeError: contract or order was not created.
     """
-    try:
-        contract = make_contract(symbol)
-        order = make_order(action, order_type, limit_price, quantity)
-        if order_type == "LMT":
-            if not validate_lmt_MoE(contract, limit_price):
-                raise ValueError(f"Limit price {limit_price} out of bounds")
-        submit_order(contract, order)
-        logger.info(f"Performed {action} on {symbol}")
-        telegram_client.tel_notify(f"{action} {symbol} succeeded")
-    except ValueError as e:
-        logger.error(f"ACORN rejected an order: {e}")
-        telegram_client.tel_notify(f"ACORN rejected an order: {e}")
-    except RuntimeError as e:
-        logger.error(f"ACORN hit a runtime error: {e}")
-        telegram_client.tel_notify(f"ACORN hit a runtime error placing a trade: {e}")
+    contract = make_contract(symbol)
+    order = make_order(action, order_type, limit_price, quantity)
+    if order_type == "LMT":
+        if not validate_lmt_MoE(contract, limit_price):
+            raise ValueError(f"Limit price {limit_price} out of bounds")
+    submit_order(contract, order)
+    logger.info(f"Performed {action} on {symbol}")
+    telegram_client.tel_notify(f"{action} {symbol} succeeded")
 
 
 def validate_lmt_MoE(contract: Contract, limit_price: float | None) -> bool:
@@ -286,9 +265,12 @@ def dispatch_acorn(event: str) -> None:
     """
     portfolio_data = get_account_portfolio_json()
 
-    if event in ("open", "noon"):
-        get_trade_dec(portfolio_data)
-    elif event == "eod":
-        eod_analysis(portfolio_data)
-    else:
-        logger.warning(f"Unrecognized event type {event}")
+    try:
+        if event in ("open", "noon"):
+            get_trade_dec(portfolio_data)
+        elif event == "eod":
+            eod_analysis(portfolio_data)
+        else:
+            logger.warning(f"Unrecognized event type {event}")
+    except Exception as e:
+        raise EngineError(e)

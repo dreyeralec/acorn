@@ -28,7 +28,7 @@ class TelegramClient:
                 timeout=10
             )
             res.raise_for_status()
-        except RequestException as e:
+        except Exception as e:
             raise TelegramServiceError(f"Telegram API call to {endpoint} failed:\n{e}") from e
 
 
@@ -52,10 +52,7 @@ class TelegramClient:
             Args:
                 message: string to send to the user.
         """
-        try:
-            self._post("sendMessage", {"chat_id": 8837613504, "text": message})
-        except TelegramServiceError as e:
-            logger.error(f"Failed to send Telegram notification: {e}")
+        self._post("sendMessage", {"chat_id": 8837613504, "text": message})
 
 
     def tel_send_trade(self, symbol: str, action: str, quantity: int, order_type: str, limit_price: float | None, reasoning: str, act: int, totalActs: int) -> None:
@@ -104,7 +101,7 @@ class TelegramClient:
                 return message["text"]
 
         except RequestException as e:
-            raise TelegramServiceError(f"Telegram API call to getUpdates failed:\n{e}") from e
+            raise TelegramServiceError(f"Telegram API call to getUpdates failed:\n{e}")
 
 
 def _get_telegram_client(key: str | None) -> TelegramClient:
