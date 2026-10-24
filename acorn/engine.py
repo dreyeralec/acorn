@@ -261,16 +261,17 @@ def dispatch_acorn(event: str) -> None:
     """ACORN's core processing. Fetch portfolio data and respond to the event.
 
         Args:
-            event: event ACORN is responding to (open, noon, eod)
+            event: event ACORN is responding to
     """
     portfolio_data = get_account_portfolio_json()
 
     try:
-        if event in ("open", "noon"):
+        if event == "trade":
             get_trade_dec(portfolio_data)
-        elif event == "eod":
+        elif event == "analysis":
             eod_analysis(portfolio_data)
         else:
             logger.warning(f"Unrecognized event type {event}")
+            raise NotImplementedError(f"Unrecognized event type {event}")
     except Exception as e:
         raise EngineError(e)

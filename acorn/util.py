@@ -1,5 +1,9 @@
 import pandas as pd
 
+from .config import WakeUpEvent, config
+from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
+
 
 NASDAQ_TICKERS_URL = "https://www.nasdaqtrader.com/dynamic/SymDir/nasdaqlisted.txt"
 OTHER_TICKERS_URL = "https://www.nasdaqtrader.com/dynamic/SymDir/otherlisted.txt"
@@ -37,34 +41,34 @@ def is_valid_ticker(symbol: str) -> bool:
     return symbol.upper() in US_MARKET_TICKERS
 
 
-def time_to_next_position_update() -> tuple[float, str]: # make these wake up windows customizable
-    """Gets amount of time for ACORN to sleep until the next position update window
-        currently using market open, noon, and eod.
+def time_to_next_position_update() -> tuple[float, str]:
+    """Gets amount of time for ACORN to sleep until the next position update window.
 
         Returns:
             Tuple containing seconds till the next event and the name of the event
-            'open', 'noon', or 'eod'.
     """
-    from datetime import datetime, timedelta
-    from zoneinfo import ZoneInfo
-    
-    nowEst = datetime.now(ZoneInfo("America/New_York"))
-    day = nowEst.weekday()
-    targetOpen = nowEst.replace(hour=9, minute=30,  second=1, microsecond=0)
-    targetNoon = nowEst.replace(hour=12, minute=45, second=0, microsecond=0)
-    targetEod = nowEst.replace(hour=16, minute=0, second=0, microsecond=0)
-    if day > 4:
-        nextDay = targetOpen + timedelta(days=1)
-        return (nextDay - nowEst).total_seconds(), "open"
-    if nowEst < targetOpen:
-        return (targetOpen - nowEst).total_seconds(), "open"
-    elif nowEst < targetNoon:
-        return (targetNoon - nowEst).total_seconds(), "noon"
-    elif nowEst < targetEod:
-        return (targetEod - nowEst).total_seconds(), "eod"
-    else:
-        nextOpen = targetOpen + timedelta(days=1)
-        return (nextOpen - nowEst).total_seconds(), "open"
+    now: datetime = datetime.now(ZoneInfo("America/New_York"))
+    events: list[WakeUpEvent] = sorted(config.wake_up_events, key=lambda e: (e.hour, e.minute, e.second))
+    if not events:
+        raise ValueError("No wake up events were configured")
+    for days_ahead in range(4):
+        target_date = now.date() + timedelta(days=days_ahead)
+        if target_date.weekday() > 4:
+            continue
+        for event in events:
+            target = now.replace(
+                year=target_date.year,
+                month=target_date.month,
+                day=target_date.day,
+                hour=event.hour,
+                minute=event.minute,
+                second=event.second,
+                microsecond=0
+            )
+            if target > now:
+                return (target - now).total_seconds(), event.type
+
+    raise RuntimeError("Couldn't find the next wake up event")
 
 
 def eval_user_res(res: str | None) -> bool:

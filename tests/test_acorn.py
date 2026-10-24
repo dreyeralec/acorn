@@ -94,7 +94,7 @@ def test_make_invalid_order_quantity():
     with pytest.raises(ValueError, match=f"Invalid quantity {q}"):
         _ = make_order(a, ot, l, q)
 
-# test limit price code paths
+
 def test_make_invalid_order_no_limit_price():
     a = "BUY"
     ot = "LMT"

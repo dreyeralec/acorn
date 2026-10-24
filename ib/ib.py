@@ -16,10 +16,6 @@ from ibapi.wrapper import EWrapper
 logger = logging.getLogger(__name__)
 
 
-# I want to fix this file and make its implementation a lot cleaner
-
-# Wrapper for handling callback functions called by the gateway connection
-# custom functionality can be added here
 class IBApp(EWrapper, EClient):
     def __init__(self) -> None:
         EClient.__init__(self, wrapper=self)
