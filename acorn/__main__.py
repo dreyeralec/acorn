@@ -50,6 +50,9 @@ def main():
             except TelegramServiceError as e:
                 logger.critical(f"Lost communication with telegram during an Engine Error, shutting down ACORN: {e}")
                 break
+        except Exception as e:
+            logger.critical(f"Acorn hit an unexpected error and is shutting down: {e}")
+            break
 
 
 if __name__ == "__main__":
