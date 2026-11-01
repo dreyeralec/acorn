@@ -19,7 +19,7 @@ engine:
       minute: 45
       second: 0
       type: "trade"
-    - hour: 4
+    - hour: 16
       minute: 0
       second: 0
       type: "analysis"

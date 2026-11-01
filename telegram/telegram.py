@@ -14,7 +14,6 @@ class TelegramServiceError(Exception):
 
 class TelegramClient:
     def __init__(self, token: str):
-        self.session = requests.Session()
         self.token = token
         self.offset = None
         
@@ -22,19 +21,19 @@ class TelegramClient:
     def _post(self, endpoint: str, payload: dict[str, str | int]) -> None:
         """Helper for posting to the Telegram API."""
         try:
-            res = self.session.post(
+            res = requests.post(
                 f"https://api.telegram.org/bot{self.token}/{endpoint}",
                 json=payload,
                 timeout=10
             )
             res.raise_for_status()
         except Exception as e:
-            raise TelegramServiceError(f"Telegram API call to {endpoint} failed:\n{e}") from e
+            raise TelegramServiceError(f"Telegram API call to {endpoint} failed:\n{e}")
 
 
     def _sync_telegram_offset(self) -> None:
         """Set offset variable to next telegram offset."""
-        response = self.session.get(
+        response = requests.get(
             f"https://api.telegram.org/bot{self.token}/getUpdates",
             params={"offset": -1, "timeout": 0}
         )
@@ -88,7 +87,7 @@ class TelegramClient:
         try:
             if self.offset is None:
                 self._sync_telegram_offset()
-            res = self.session.get(f"https://api.telegram.org/bot{self.token}/getUpdates", params={"timeout": config.timeout, "offset": self.offset})
+            res = requests.get(f"https://api.telegram.org/bot{self.token}/getUpdates", params={"timeout": config.timeout, "offset": self.offset})
             res.raise_for_status()
             data = res.json()
             for update in data["result"]:
