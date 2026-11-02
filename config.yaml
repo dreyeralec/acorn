@@ -1,3 +1,5 @@
+environment: "container"
+
 ib:
   account_type: "paper"
   data_relevancy: 3

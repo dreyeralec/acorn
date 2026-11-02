@@ -1,0 +1,30 @@
+name: acorn
+
+services:
+  acorn:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: acorn
+    restart: unless-stopped
+    depends_on:
+      ib-gateway:
+        condition: service_started
+    environment:
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      TELEGRAM_BOT_KEY: ${TELEGRAM_BOT_KEY}
+      IB_HOST: ib-gateway
+      IB_PORT: 4004 #port forwarding (paper: 4004, live: 4003)
+      IB_CLIENT_ID: 1
+
+  ib-gateway:
+    image: ghcr.io/gnzsnz/ib-gateway:latest
+    container_name: ib-gateway
+    restart: unless-stopped
+    environment:
+      TWS_USERID: ${TWS_USERID}
+      TWS_PASSWORD: ${TWS_PASSWORD}
+      TRADING_MODE: paper
+      READ_ONLY_API: "no"
+      TWOFA_TIMEOUT_ACTION: exit
+      TIME_ZONE: America/Denver

@@ -25,7 +25,8 @@ class Config:
     def load_config(self, config_file) -> None:
         with open(config_file, 'r') as file:
             config = yaml.safe_load(file)
-        self.ibg_port: int = _get_port(config["ib"]["account_type"])
+        self.ibg_port: int = _get_port(acc_type=config["ib"]["account_type"], environment=config["environment"])
+        self.host: str = _get_host(config["environment"])
         self.data_relevancy: int = config["ib"]["data_relevancy"]
         self.limit_MoE: float = config["ib"]["limit_MoE"]
         self.model: str = config["llm"]["model"]
@@ -35,13 +36,26 @@ class Config:
         self.wake_up_events: list[WakeUpEvent] = _build_wake_up_events(config["engine"]["wake_ups"])
 
 
-def _get_port(acc_type: str) -> int:
-    if acc_type == "paper":
-        return 4002
-    if acc_type == "live":
-        return 4001
+def _get_port(acc_type: str, environment: str) -> int:
+    if environment == "local":
+        if acc_type == "live":
+            return 4001
+        if acc_type == "paper":
+            return 4002
+    if environment == "container":
+        if acc_type == "live":
+            return 4003
+        if acc_type == "paper":
+            return 4004
     else:
-        raise NotImplementedError(f"No port assigned for: {acc_type}")
+        raise NotImplementedError(f"No port assigned for: {acc_type} and environment: {environment}")
+
+
+def _get_host(environment: str) -> str:
+    if environment == "local":
+        return "127.0.0.1"
+    if environment == "container":
+        return "ib-gateway"
 
 
 def _build_wake_up_events(config: list[dict[str, object]]) -> list[WakeUpEvent]:

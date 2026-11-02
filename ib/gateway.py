@@ -2,6 +2,7 @@ import logging
 import threading
 
 from ib.ib import IBApp
+from acorn.config import config
 
 logger = logging.getLogger(__name__)
 
@@ -9,11 +10,11 @@ _app: IBApp | None = None
 _lock = threading.Lock()
 
 
-def run_loop(app):
+def run_loop(app: IBApp):
     app.run()
 
 
-def connect_ib_gateway(host="127.0.0.1", port=4002, client_id=1, timeout=10) -> IBApp:
+def connect_ib_gateway(host=config.host, port=config.ibg_port, client_id=1, timeout=30) -> IBApp:
     """Connect client to IB Gateway, or return the existing connection.
 
         Subsequent calls (from any module) return the same IBApp instance
@@ -22,7 +23,7 @@ def connect_ib_gateway(host="127.0.0.1", port=4002, client_id=1, timeout=10) -> 
 
         Args:
             host: Host ip address of gateway
-            port: Port to connect to gateway on (4001: live, 4002: paper)
+            port: Port to connect to gateway on (4001: live, 4002: paper, 4003: live container, 4004: paper container)
             client_id: Client id to start the connection with (gets incremented during session)
             timeout: Connection wide timeout window value
 
@@ -36,20 +37,16 @@ def connect_ib_gateway(host="127.0.0.1", port=4002, client_id=1, timeout=10) -> 
 
     if _app is not None and _app.isConnected():
         return _app
-
     with _lock:
         if _app is not None and _app.isConnected():
             return _app
-
         app = IBApp()
         app.connect(host, port, clientId=client_id)
         thread = threading.Thread(target=run_loop, args=(app,), daemon=True)
         thread.start()
-
         if not app.connected_event.wait(timeout=timeout):
             logger.error("Failed to connect to gateway within timeout")
             raise ConnectionError
-
         _app = app
         return _app
 
