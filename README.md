@@ -27,8 +27,10 @@ Model looks at portfolio and account data and sends user any actions it wants to
 
 Model reviews portfolio performance, gives user an overview of how the portfolio is doing vs. broader market.
 
+## Containers - (docker-compose.yaml)
+- IB Gateway - gateway service allowing Acorn to place orders with Interactive Brokers
+- Acorn - facilitates API calls with OpenAI's API and the IB Gateway
+
 ## In the future
 - Support for other AI models
 - Pipelines for providing real data to the model instead of relying on its web-search tool
-- Configurable wake-up times
-- Containerized to run in the cloud
