@@ -31,6 +31,16 @@ Model reviews portfolio performance, gives user an overview of how the portfolio
 - IB Gateway - gateway service allowing Acorn to place orders with Interactive Brokers
 - Acorn - facilitates API calls with OpenAI's API and the IB Gateway
 
+## Environment File - (.env)
+Currently Acorn uses a .env file to inject credentials.
+```
+    OPENAI_API_KEY: string API key available at https://openai.com/api/
+    TELEGRAM_BOT_KEY: string key to provide programmatic access to your telegram bot. Available at https://core.telegram.org/bots/tutorial
+    TWS_USERID: your interactive brokers username
+    TWS_PASSWORD: your interactive brokers password, needed in order to launch the ib-gateway image
+```
+
 ## In the future
 - Support for other AI models
 - Pipelines for providing real data to the model instead of relying on its web-search tool
+- Web interface inside **acorn** container to configure settings and provide dependency credentials currently stored in .env
