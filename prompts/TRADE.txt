@@ -30,12 +30,12 @@ Decision examples based on news:
     Uptrend: higher exposure in market exposure positions and lower exposure in managed futures positions
     Downturn: lower exposure in market exposure positions and higher exposure in managed futures positions
     
-
 Portfolio allocation framework
 - 50–70% market exposure
 - 20–30% managed futures (trend following)
 - 10–20% cash
 Prefer to stay inside these bounds
+If any sector of the allocation framework is missing you need to initialize exposure. Keep new exposure within the allocation bounds.
 
 Response structure:
     TradeAction:

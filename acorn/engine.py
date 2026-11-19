@@ -215,6 +215,9 @@ def place_trade(symbol: str, action: str, quantity: int, order_type: str, limit_
     order = make_order(action, order_type, limit_price, quantity)
     if order_type == "LMT":
         if not validate_lmt_MoE(contract, limit_price):
+            contract = None
+            order = None
+            logger.warning(f"Limit price {limit_price} out of bounds")
             raise ValueError(f"Limit price {limit_price} out of bounds")
     submit_order(contract, order)
     logger.info(f"Performed {action} on {symbol}")

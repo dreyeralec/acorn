@@ -1,4 +1,4 @@
-environment: "container"
+environment: "container" # 'container' or 'local'
 
 ib:
   account_type: "paper"
